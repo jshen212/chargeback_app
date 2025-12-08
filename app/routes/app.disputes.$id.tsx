@@ -1,5 +1,6 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData, Link } from "@remix-run/react";
+import { useState, useEffect } from "react";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { useLoaderData, Link, useFetcher, redirect } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -9,10 +10,12 @@ import {
   InlineStack,
   Badge,
   Button,
+  TextField,
 } from "@shopify/polaris";
-import { TitleBar } from "@shopify/app-bridge-react";
+import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { getDisputeById } from "../models.server";
+import { getDisputeById, createDisputeResponse } from "../models.server";
+import { generateDisputeResponse } from "../openai.server";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -31,8 +34,192 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   return { dispute };
 };
 
+export const action = async ({ request, params }: ActionFunctionArgs) => {
+  await authenticate.admin(request);
+  const disputeId = params.id;
+
+  if (!disputeId) {
+    throw new Response("Dispute ID is required", { status: 400 });
+  }
+
+  const dispute = await getDisputeById(disputeId);
+
+  if (!dispute) {
+    throw new Response("Dispute not found", { status: 404 });
+  }
+
+  const formData = await request.formData();
+  const intent = formData.get("intent");
+
+  if (intent === "generate") {
+    try {
+      const responseText = await generateDisputeResponse({
+        shopifyDisputeId: dispute.shopifyDisputeId,
+        orderName: dispute.orderName,
+        customerEmail: dispute.customerEmail,
+        status: dispute.status,
+        reason: dispute.reason,
+        chargebackReason: dispute.chargebackReason,
+        amount: dispute.amount ? Number(dispute.amount) : null,
+        currency: dispute.currency,
+        rawPayload: dispute.rawPayload,
+      });
+
+      return { success: true, responseText, error: null };
+    } catch (error) {
+      return {
+        success: false,
+        responseText: null,
+        error:
+          error instanceof Error ? error.message : "Failed to generate response",
+      };
+    }
+  }
+
+  if (intent === "save") {
+    const draftText = formData.get("draftText") as string;
+
+    if (!draftText || draftText.trim() === "") {
+      return {
+        success: false,
+        error: "Response text cannot be empty",
+      };
+    }
+
+    try {
+      await createDisputeResponse({
+        disputeId: dispute.id,
+        shopId: dispute.shopId,
+        draftText: draftText.trim(),
+        modelUsed: "gpt-4o-mini",
+      });
+
+      // Redirect to reload the page with the new response
+      return redirect(`/app/disputes/${disputeId}`);
+    } catch (error) {
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Failed to save response",
+      };
+    }
+  }
+
+  return { success: false, error: "Invalid action" };
+};
+
 export default function DisputeDetail() {
   const { dispute } = useLoaderData<typeof loader>();
+  const fetcher = useFetcher<typeof action>();
+  const shopify = useAppBridge();
+
+  const latestResponse = dispute.disputeResponses[0];
+  const [responseText, setResponseText] = useState(
+    latestResponse?.draftText || "",
+  );
+
+  // Update text area when generation completes
+  useEffect(() => {
+    if (fetcher.data?.success && fetcher.data.responseText) {
+      setResponseText(fetcher.data.responseText);
+    }
+  }, [fetcher.data?.responseText]);
+
+  // Show toast notifications
+  useEffect(() => {
+    if (fetcher.data?.error) {
+      shopify.toast.show(fetcher.data.error, { isError: true });
+    }
+  }, [fetcher.data?.error, shopify]);
+
+  const isGenerating =
+    fetcher.state === "submitting" && fetcher.formData?.get("intent") === "generate";
+  const isSaving =
+    fetcher.state === "submitting" && fetcher.formData?.get("intent") === "save";
+
+  const placeholderText = latestResponse
+    ? ""
+    : "Click 'Generate a response' to create an AI-powered dispute response. The response will address the chargeback reason and provide relevant evidence.";
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(responseText);
+      shopify.toast.show("Response copied to clipboard");
+    } catch (error) {
+      shopify.toast.show("Failed to copy to clipboard", { isError: true });
+    }
+  };
+
+  const handlePrint = () => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      shopify.toast.show("Please allow popups to print", { isError: true });
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Dispute Response - ${dispute.shopifyDisputeId}</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+              max-width: 800px;
+              margin: 40px auto;
+              padding: 20px;
+              line-height: 1.6;
+              color: #333;
+            }
+            h1 {
+              color: #202223;
+              border-bottom: 2px solid #e1e3e5;
+              padding-bottom: 10px;
+              margin-bottom: 20px;
+            }
+            .dispute-info {
+              background: #f6f6f7;
+              padding: 15px;
+              border-radius: 8px;
+              margin-bottom: 30px;
+            }
+            .dispute-info p {
+              margin: 5px 0;
+            }
+            .response-content {
+              white-space: pre-wrap;
+              background: #fff;
+              padding: 20px;
+              border: 1px solid #e1e3e5;
+              border-radius: 8px;
+            }
+            @media print {
+              body {
+                margin: 0;
+                padding: 20px;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Dispute Response</h1>
+          <div class="dispute-info">
+            <p><strong>Dispute ID:</strong> ${dispute.shopifyDisputeId}</p>
+            <p><strong>Order:</strong> ${dispute.orderName || dispute.orderId || "N/A"}</p>
+            <p><strong>Customer Email:</strong> ${dispute.customerEmail || "N/A"}</p>
+            <p><strong>Status:</strong> ${dispute.status || "N/A"}</p>
+            <p><strong>Amount:</strong> ${dispute.amount && dispute.currency ? `${dispute.currency} ${dispute.amount}` : "N/A"}</p>
+          </div>
+          <div class="response-content">${responseText}</div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  };
 
   return (
     <Page>
@@ -81,12 +268,12 @@ export default function DisputeDetail() {
                     </Text>
                     {dispute.status ? (
                       <Badge
-                        status={
+                        tone={
                           dispute.status === "won"
                             ? "success"
                             : dispute.status === "lost"
-                            ? "critical"
-                            : "info"
+                              ? "critical"
+                              : "info"
                         }
                       >
                         {dispute.status}
@@ -138,7 +325,7 @@ export default function DisputeDetail() {
                       Evidence Submitted:
                     </Text>
                     {dispute.evidenceSubmitted ? (
-                      <Badge status="success">Yes</Badge>
+                      <Badge tone="success">Yes</Badge>
                     ) : (
                       <Badge>No</Badge>
                     )}
@@ -165,25 +352,60 @@ export default function DisputeDetail() {
             <Card>
               <BlockStack gap="400">
                 <Text as="h2" variant="headingMd">
-                  Raw Payload
+                  Dispute Response
                 </Text>
-                <BlockStack gap="200">
-                  <Text as="p" variant="bodyMd" tone="subdued">
-                    This is placeholder content showing the raw webhook payload.
-                  </Text>
-                  <pre
-                    style={{
-                      padding: "16px",
-                      background: "#f6f6f7",
-                      borderRadius: "8px",
-                      overflow: "auto",
-                      fontSize: "12px",
-                    }}
-                  >
-                    <code>
-                      {JSON.stringify(dispute.rawPayload, null, 2)}
-                    </code>
-                  </pre>
+                <BlockStack gap="300">
+                  <TextField
+                    label="Response Draft"
+                    value={responseText}
+                    onChange={setResponseText}
+                    multiline={10}
+                    placeholder={placeholderText}
+                    helpText={
+                      latestResponse
+                        ? "Edit the response below. Click 'Save' to save your changes."
+                        : "Generate an AI-powered response or write your own."
+                    }
+                  />
+                  <InlineStack gap="300">
+                    <fetcher.Form method="post">
+                      <input type="hidden" name="intent" value="generate" />
+                      <Button
+                        submit
+                        loading={isGenerating}
+                        variant="primary"
+                      >
+                        Generate a response
+                      </Button>
+                    </fetcher.Form>
+                    <fetcher.Form method="post">
+                      <input type="hidden" name="intent" value="save" />
+                      <input type="hidden" name="draftText" value={responseText} />
+                      <Button
+                        submit
+                        loading={isSaving}
+                        disabled={!responseText.trim()}
+                      >
+                        Save
+                      </Button>
+                    </fetcher.Form>
+                    {responseText.trim() && (
+                      <>
+                        <Button onClick={handleCopy}>
+                          Copy
+                        </Button>
+                        <Button onClick={handlePrint}>
+                          Print
+                        </Button>
+                      </>
+                    )}
+                  </InlineStack>
+                  {latestResponse && (
+                    <Text as="p" variant="bodyMd" tone="subdued">
+                      Last saved: {new Date(latestResponse.createdAt).toLocaleString()}
+                      {latestResponse.modelUsed && ` (Generated with ${latestResponse.modelUsed})`}
+                    </Text>
+                  )}
                 </BlockStack>
               </BlockStack>
             </Card>
@@ -193,4 +415,3 @@ export default function DisputeDetail() {
     </Page>
   );
 }
-

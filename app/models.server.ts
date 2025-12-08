@@ -36,6 +36,34 @@ export async function getDisputeById(disputeId: string) {
     where: { id: disputeId },
     include: {
       shop: true,
+      disputeResponses: {
+        orderBy: { createdAt: "desc" },
+        take: 1, // Get the most recent response
+      },
+    },
+  });
+}
+
+export async function getLatestDisputeResponse(disputeId: string) {
+  return prisma.disputeResponse.findFirst({
+    where: { disputeId },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+export async function createDisputeResponse(data: {
+  disputeId: string;
+  shopId: string;
+  draftText: string;
+  modelUsed?: string;
+}) {
+  return prisma.disputeResponse.create({
+    data: {
+      disputeId: data.disputeId,
+      shopId: data.shopId,
+      draftText: data.draftText,
+      modelUsed: data.modelUsed,
+      isFinal: false,
     },
   });
 }

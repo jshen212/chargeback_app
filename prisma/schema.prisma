@@ -43,7 +43,8 @@ model Shop {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  disputes Dispute[]
+  disputes         Dispute[]
+  disputeResponses DisputeResponse[]
 
   @@map("shops")
 }
@@ -66,8 +67,26 @@ model Dispute {
   createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  shop             Shop              @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  disputeResponses DisputeResponse[]
 
   @@unique([shopId, shopifyDisputeId], map: "disputes_shop_dispute_unique")
   @@map("disputes")
+}
+
+model DisputeResponse {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  disputeId String   @map("dispute_id") @db.Uuid
+  shopId    String   @map("shop_id") @db.Uuid
+  draftText String   @map("draft_text")
+  modelUsed String?  @map("model_used")
+  isFinal   Boolean  @default(false) @map("is_final")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  dispute Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  shop    Shop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, disputeId, createdAt(sort: Desc)], map: "idx_dispute_responses_shop_dispute_created_at")
+  @@map("dispute_responses")
 }
