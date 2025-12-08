@@ -17,12 +17,10 @@ import {
   hasActiveBilling,
   isOnTrial,
   isTestStore,
-  BILLING_PLANS,
-  MONTHLY_PRICE,
-  TRIAL_DAYS,
 } from "../billing.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const { MONTHLY_PRICE, TRIAL_DAYS } = await import("../billing.server");
   const { session, admin, billing } = await authenticate.admin(request);
   const shop = await getOrCreateShop(session.shop, session.accessToken);
 
@@ -81,6 +79,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     trialDaysRemaining,
     hasActiveSubscription,
     testStore,
+    monthlyPrice: MONTHLY_PRICE,
+    trialDays: TRIAL_DAYS,
   };
 };
 
@@ -115,6 +115,8 @@ export default function Billing() {
     trialDaysRemaining,
     hasActiveSubscription,
     testStore,
+    monthlyPrice,
+    trialDays,
   } = useLoaderData<typeof loader>();
 
   return (
@@ -165,7 +167,7 @@ export default function Billing() {
                   {onTrial && (
                     <BlockStack gap="200">
                       <Text as="p" variant="bodyMd">
-                        Your {TRIAL_DAYS}-day free trial started on{" "}
+                        Your {trialDays}-day free trial started on{" "}
                         {shop.trialStartDate
                           ? new Date(shop.trialStartDate).toLocaleDateString()
                           : "N/A"}
@@ -183,7 +185,7 @@ export default function Billing() {
                     <BlockStack gap="200">
                       <Text as="p" variant="bodyMd">
                         Your monthly subscription is active. You will be charged
-                        ${MONTHLY_PRICE} per month.
+                        ${monthlyPrice} per month.
                       </Text>
                       {subscriptionStatus?.currentPeriodEnd && (
                         <Text as="p" variant="bodyMd" tone="subdued">
@@ -215,7 +217,7 @@ export default function Billing() {
                       Monthly Plan
                     </Text>
                     <Text as="p" variant="bodyMd">
-                      ${MONTHLY_PRICE} per month
+                      ${monthlyPrice} per month
                     </Text>
                     {!hasActiveSubscription && !testStore && (
                       <Form method="post">
