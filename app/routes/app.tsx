@@ -34,7 +34,7 @@ export default function App() {
       <div style={{ marginTop: "2rem", padding: "1.5rem", textAlign: "center", borderTop: "1px solid #e1e3e5" }}>
         <InlineStack gap="400" align="center">
           <Text as="span" variant="bodySm" tone="subdued">
-            <Link to="/app/privacy">
+            <Link url="https://chargeback-app-rho.vercel.app/privacy" external>
               Privacy Policy
             </Link>
           </Text>
@@ -42,7 +42,7 @@ export default function App() {
             |
           </Text>
           <Text as="span" variant="bodySm" tone="subdued">
-            <Link to="/app/terms">
+            <Link url="https://chargeback-app-rho.vercel.app/terms" external>
               Terms of Service
             </Link>
           </Text>
