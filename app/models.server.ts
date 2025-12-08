@@ -5,7 +5,7 @@ export async function getOrCreateShop(
   shopDomain: string,
   accessToken?: string,
 ): Promise<Shop> {
-  return prisma.shop.upsert({
+  const shop = await prisma.shop.upsert({
     where: { shopDomain },
     update: {
       accessToken: accessToken,
@@ -18,6 +18,14 @@ export async function getOrCreateShop(
       active: true,
     },
   });
+
+  // Initialize trial if this is a new shop without billing setup
+  if (!shop.trialStartDate && !shop.billingActive) {
+    const { initializeTrial } = await import("./billing.server");
+    return initializeTrial(shop.id);
+  }
+
+  return shop;
 }
 
 export async function getDisputes(shopDomain: string) {

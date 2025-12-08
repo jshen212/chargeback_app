@@ -35,13 +35,23 @@ model Session {
 }
 
 model Shop {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  shopDomain String  @unique @map("shop_domain")
-  accessToken String? @map("access_token")
-  active    Boolean  @default(true)
-  plan      String?
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  shopDomain            String   @unique @map("shop_domain")
+  accessToken           String?  @map("access_token")
+  active                Boolean  @default(true)
+  plan                  String?
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  // Billing fields
+  billingActive         Boolean  @default(false) @map("billing_active")
+  billingSubscriptionId String?  @map("billing_subscription_id")
+  billingPlan           String?  @map("billing_plan")
+  trialStartDate        DateTime? @map("trial_start_date") @db.Timestamptz(6)
+  trialEndDate          DateTime? @map("trial_end_date") @db.Timestamptz(6)
+  subscriptionStartDate DateTime? @map("subscription_start_date") @db.Timestamptz(6)
+  subscriptionEndDate   DateTime? @map("subscription_end_date") @db.Timestamptz(6)
+  billingLastCheckedAt DateTime? @map("billing_last_checked_at") @db.Timestamptz(6)
 
   disputes         Dispute[]
   disputeResponses DisputeResponse[]

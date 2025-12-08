@@ -18,7 +18,14 @@ import { getDisputeById, createDisputeResponse } from "../models.server";
 import { generateDisputeResponse } from "../openai.server";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
+  const { billing } = await authenticate.admin(request);
+  
+  // Gate this route - require active billing per Shopify guidelines
+  await (billing.require as any)({
+    plans: ["monthly"],
+    isTest: process.env.NODE_ENV !== "production",
+  });
+  
   const disputeId = params.id;
 
   if (!disputeId) {
@@ -35,7 +42,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-  await authenticate.admin(request);
+  const { billing } = await authenticate.admin(request);
+  
+  // Gate this route - require active billing per Shopify guidelines
+  await (billing.require as any)({
+    plans: ["monthly"],
+    isTest: process.env.NODE_ENV !== "production",
+  });
+  
   const disputeId = params.id;
 
   if (!disputeId) {

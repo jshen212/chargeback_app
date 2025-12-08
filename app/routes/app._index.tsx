@@ -15,7 +15,16 @@ import { authenticate } from "../shopify.server";
 import { getDisputes } from "../models.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, billing } = await authenticate.admin(request);
+
+  // Gate this route - require active billing per Shopify guidelines
+  // https://shopify.dev/docs/apps/launch/billing#gate-requests
+  // billing.require() will redirect to billing page if no active subscription
+  await (billing.require as any)({
+    plans: ["monthly"],
+    isTest: process.env.NODE_ENV !== "production",
+  });
+
   const disputes = await getDisputes(session.shop);
 
   return { disputes };
