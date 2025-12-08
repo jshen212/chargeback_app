@@ -20,10 +20,10 @@ import { isTestStore } from "../billing.server";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { billing, admin, session } = await authenticate.admin(request);
-  
+
   // Check if this is a test store - bypass billing for test stores
   const testStore = await isTestStore(admin, session.shop);
-  
+
   if (!testStore) {
     // Gate this route - require active billing per Shopify guidelines
     try {
@@ -51,7 +51,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       });
     }
   }
-  
+
   const disputeId = params.id;
 
   if (!disputeId) {
@@ -69,10 +69,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { billing, admin, session } = await authenticate.admin(request);
-  
+
   // Check if this is a test store - bypass billing for test stores
   const testStore = await isTestStore(admin, session.shop);
-  
+
   if (!testStore) {
     // Gate this route - require active billing per Shopify guidelines
     try {
@@ -100,7 +100,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       });
     }
   }
-  
+
   const disputeId = params.id;
 
   if (!disputeId) {
@@ -136,7 +136,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         success: false,
         responseText: null,
         error:
-          error instanceof Error ? error.message : "Failed to generate response",
+          error instanceof Error
+            ? error.message
+            : "Failed to generate response",
       };
     }
   }
@@ -183,24 +185,33 @@ export default function DisputeDetail() {
     latestResponse?.draftText || "",
   );
 
+  const fetcherResponseText =
+    fetcher.data && "responseText" in fetcher.data
+      ? fetcher.data.responseText
+      : null;
+  const fetcherError =
+    fetcher.data && "error" in fetcher.data ? fetcher.data.error : null;
+
   // Update text area when generation completes
   useEffect(() => {
-    if (fetcher.data?.success && fetcher.data.responseText) {
-      setResponseText(fetcher.data.responseText);
+    if (fetcher.data?.success && fetcherResponseText) {
+      setResponseText(fetcherResponseText as string);
     }
-  }, [fetcher.data?.responseText]);
+  }, [fetcher.data, fetcherResponseText]);
 
   // Show toast notifications
   useEffect(() => {
-    if (fetcher.data?.error) {
-      shopify.toast.show(fetcher.data.error, { isError: true });
+    if (fetcherError) {
+      shopify.toast.show(fetcherError as string, { isError: true });
     }
-  }, [fetcher.data?.error, shopify]);
+  }, [fetcherError, shopify]);
 
   const isGenerating =
-    fetcher.state === "submitting" && fetcher.formData?.get("intent") === "generate";
+    fetcher.state === "submitting" &&
+    fetcher.formData?.get("intent") === "generate";
   const isSaving =
-    fetcher.state === "submitting" && fetcher.formData?.get("intent") === "save";
+    fetcher.state === "submitting" &&
+    fetcher.formData?.get("intent") === "save";
 
   const placeholderText = latestResponse
     ? ""
@@ -425,6 +436,7 @@ export default function DisputeDetail() {
                     value={responseText}
                     onChange={setResponseText}
                     multiline={10}
+                    autoComplete="off"
                     placeholder={placeholderText}
                     helpText={
                       latestResponse
@@ -435,17 +447,17 @@ export default function DisputeDetail() {
                   <InlineStack gap="300">
                     <fetcher.Form method="post">
                       <input type="hidden" name="intent" value="generate" />
-                      <Button
-                        submit
-                        loading={isGenerating}
-                        variant="primary"
-                      >
+                      <Button submit loading={isGenerating} variant="primary">
                         Generate a response
                       </Button>
                     </fetcher.Form>
                     <fetcher.Form method="post">
                       <input type="hidden" name="intent" value="save" />
-                      <input type="hidden" name="draftText" value={responseText} />
+                      <input
+                        type="hidden"
+                        name="draftText"
+                        value={responseText}
+                      />
                       <Button
                         submit
                         loading={isSaving}
@@ -456,19 +468,17 @@ export default function DisputeDetail() {
                     </fetcher.Form>
                     {responseText.trim() && (
                       <>
-                        <Button onClick={handleCopy}>
-                          Copy
-                        </Button>
-                        <Button onClick={handlePrint}>
-                          Print
-                        </Button>
+                        <Button onClick={handleCopy}>Copy</Button>
+                        <Button onClick={handlePrint}>Print</Button>
                       </>
                     )}
                   </InlineStack>
                   {latestResponse && (
                     <Text as="p" variant="bodyMd" tone="subdued">
-                      Last saved: {new Date(latestResponse.createdAt).toLocaleString()}
-                      {latestResponse.modelUsed && ` (Generated with ${latestResponse.modelUsed})`}
+                      Last saved:{" "}
+                      {new Date(latestResponse.createdAt).toLocaleString()}
+                      {latestResponse.modelUsed &&
+                        ` (Generated with ${latestResponse.modelUsed})`}
                     </Text>
                   )}
                 </BlockStack>
