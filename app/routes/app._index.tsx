@@ -13,17 +13,46 @@ import {
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { getDisputes } from "../models.server";
+import { isTestStore } from "../billing.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session, billing } = await authenticate.admin(request);
+  const { session, billing, admin } = await authenticate.admin(request);
 
-  // Gate this route - require active billing per Shopify guidelines
-  // https://shopify.dev/docs/apps/launch/billing#gate-requests
-  // billing.require() will redirect to billing page if no active subscription
-  await (billing.require as any)({
-    plans: ["monthly"],
-    isTest: process.env.NODE_ENV !== "production",
-  });
+  // Check if this is a test store - bypass billing for test stores
+  const testStore = await isTestStore(admin, session.shop);
+  
+  if (!testStore) {
+    // Gate this route - require active billing per Shopify guidelines
+    // https://shopify.dev/docs/apps/launch/billing#gate-requests
+    // billing.require() will redirect to billing page if no active subscription
+    try {
+      await (billing.require as any)({
+        plans: ["monthly"],
+        isTest: process.env.NODE_ENV !== "production",
+        onFailure: () => {
+          // Redirect to billing page if no active subscription
+          throw new Response(null, {
+            status: 302,
+            headers: {
+              Location: "/app/billing",
+            },
+          });
+        },
+      });
+    } catch (error) {
+      // If it's a redirect response, rethrow it
+      if (error instanceof Response) {
+        throw error;
+      }
+      // Otherwise redirect to billing page
+      throw new Response(null, {
+        status: 302,
+        headers: {
+          Location: "/app/billing",
+        },
+      });
+    }
+  }
 
   const disputes = await getDisputes(session.shop);
 

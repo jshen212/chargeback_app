@@ -16,6 +16,7 @@ import { getOrCreateShop } from "../models.server";
 import {
   hasActiveBilling,
   isOnTrial,
+  isTestStore,
   BILLING_PLANS,
   MONTHLY_PRICE,
   TRIAL_DAYS,
@@ -25,24 +26,36 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, admin, billing } = await authenticate.admin(request);
   const shop = await getOrCreateShop(session.shop, session.accessToken);
 
+  // Check if this is a test store - bypass billing for test stores
+  const testStore = await isTestStore(admin, session.shop);
+
   // Check current subscription status using Shopify's billing API
   // This follows Shopify guidelines: https://shopify.dev/docs/apps/launch/billing
   // billing.require() throws if no subscription, so we catch and handle gracefully
   let subscriptionStatus = null;
   let hasActiveSubscription = false;
   
-  try {
-    const result = await (billing.require as any)({
-      plans: ["monthly"],
-      isTest: process.env.NODE_ENV !== "production",
-      returnObject: true,
-    });
-    subscriptionStatus = result;
+  if (!testStore) {
+    try {
+      const result = await (billing.require as any)({
+        plans: ["monthly"],
+        isTest: process.env.NODE_ENV !== "production",
+        returnObject: true,
+        onFailure: () => {
+          // Return null to indicate no active subscription
+          return null;
+        },
+      });
+      subscriptionStatus = result;
+      hasActiveSubscription = true;
+    } catch (error) {
+      // Subscription not found or not active - this is expected for new shops or during trial
+      // billing.require() throws when subscription is not active
+      hasActiveSubscription = false;
+    }
+  } else {
+    // For test stores, always show as having active subscription (bypass billing)
     hasActiveSubscription = true;
-  } catch (error) {
-    // Subscription not found or not active - this is expected for new shops or during trial
-    // billing.require() throws when subscription is not active
-    hasActiveSubscription = false;
   }
 
   // Convert dates from strings to Date objects if needed
@@ -67,6 +80,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     activeBilling,
     trialDaysRemaining,
     hasActiveSubscription,
+    testStore,
   };
 };
 
@@ -82,6 +96,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return (billing.request as any)({
       plan: "monthly",
       isTest: process.env.NODE_ENV !== "production",
+      onFailure: () => {
+        // Handle failure - could redirect or show error
+        return new Response("Failed to create subscription", { status: 500 });
+      },
     });
   }
 
@@ -96,6 +114,7 @@ export default function Billing() {
     activeBilling,
     trialDaysRemaining,
     hasActiveSubscription,
+    testStore,
   } = useLoaderData<typeof loader>();
 
   return (
@@ -110,24 +129,37 @@ export default function Billing() {
                   Subscription Plan
                 </Text>
                 <BlockStack gap="300">
+                  {testStore && (
+                    <BlockStack gap="200">
+                      <Badge tone="info">Test Store</Badge>
+                      <Text as="p" variant="bodyMd" tone="subdued">
+                        This is a test/development store. Billing is bypassed for testing purposes.
+                      </Text>
+                    </BlockStack>
+                  )}
                   <InlineStack align="space-between">
                     <BlockStack gap="100">
                       <Text as="span" variant="bodyMd" fontWeight="semibold">
                         Current Plan:
                       </Text>
                       <Text as="span" variant="bodyMd">
-                        {onTrial
-                          ? `Free Trial (${trialDaysRemaining} days remaining)`
-                          : hasActiveSubscription
-                            ? "Monthly Subscription"
-                            : "No Active Plan"}
+                        {testStore
+                          ? "Test Store (Billing Bypassed)"
+                          : onTrial
+                            ? `Free Trial (${trialDaysRemaining} days remaining)`
+                            : hasActiveSubscription
+                              ? "Monthly Subscription"
+                              : "No Active Plan"}
                       </Text>
                     </BlockStack>
-                    {onTrial && <Badge tone="info">Trial</Badge>}
-                    {hasActiveSubscription && (
+                    {testStore && <Badge tone="info">Test</Badge>}
+                    {onTrial && !testStore && <Badge tone="info">Trial</Badge>}
+                    {hasActiveSubscription && !testStore && (
                       <Badge tone="success">Active</Badge>
                     )}
-                    {!activeBilling && <Badge tone="critical">Expired</Badge>}
+                    {!activeBilling && !testStore && (
+                      <Badge tone="critical">Expired</Badge>
+                    )}
                   </InlineStack>
 
                   {onTrial && (
@@ -185,13 +217,18 @@ export default function Billing() {
                     <Text as="p" variant="bodyMd">
                       ${MONTHLY_PRICE} per month
                     </Text>
-                    {!hasActiveSubscription && (
+                    {!hasActiveSubscription && !testStore && (
                       <Form method="post">
                         <input type="hidden" name="intent" value="subscribe" />
                         <Button submit variant="primary">
                           Subscribe to Monthly Plan
                         </Button>
                       </Form>
+                    )}
+                    {testStore && (
+                      <Text as="p" variant="bodyMd" tone="subdued">
+                        Test stores do not require subscription. Billing is automatically bypassed.
+                      </Text>
                     )}
                   </BlockStack>
                 </BlockStack>

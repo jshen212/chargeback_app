@@ -14,6 +14,53 @@ export const MONTHLY_PRICE = 9.99;
 export const TRIAL_DAYS = 7;
 
 /**
+ * Check if a shop is a test/development store
+ * Test stores should bypass billing requirements
+ */
+export async function isTestStore(
+  admin: any,
+  shopDomain: string,
+): Promise<boolean> {
+  try {
+    const response = await admin.graphql(`
+      query {
+        shop {
+          plan {
+            displayName
+            partnerDevelopment
+          }
+        }
+      }
+    `);
+
+    const data = await response.json();
+    const plan = data?.data?.shop?.plan;
+
+    // Check if it's a partner development store or development plan
+    if (plan?.partnerDevelopment || plan?.displayName?.toLowerCase().includes("development")) {
+      return true;
+    }
+
+    // Also check if shop domain contains test indicators
+    // Development stores often have specific patterns
+    if (
+      shopDomain.includes(".myshopify.com") &&
+      (shopDomain.includes("dev-") ||
+        shopDomain.includes("test-") ||
+        shopDomain.includes("staging-"))
+    ) {
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    // If we can't determine, default to false (require billing)
+    console.error("Error checking test store status:", error);
+    return false;
+  }
+}
+
+/**
  * Check if a shop is currently on trial
  */
 export function isOnTrial(shop: {
@@ -124,4 +171,3 @@ export async function updateShopBilling(
     },
   });
 }
-
