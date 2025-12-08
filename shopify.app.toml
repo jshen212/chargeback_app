@@ -1,8 +1,8 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "e70a56501de7aa34ecbdc6c3ad952ba4"
-name = "remix-test"
-application_url = "https://remix-test-drab.vercel.app"
+client_id = "ebc29e65b44032abebf820cfb8b60b0b"
+name = "chargeback-app"
+application_url = "https://chargeback-app-rho.vercel.app/"
 embedded = true
 
 [build]
@@ -24,4 +24,4 @@ api_version = "2026-01"
 scopes = "write_products"
 
 [auth]
-redirect_urls = [ "https://remix-test-drab.vercel.app/api/auth" ]
+redirect_urls = [ "https://chargeback-app-rho.vercel.app/api/auth" ]

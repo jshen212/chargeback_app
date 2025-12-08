@@ -18,9 +18,9 @@ import {
   isOnTrial,
   isTestStore,
 } from "../billing.server";
+import { MONTHLY_PRICE, TRIAL_DAYS } from "../billing.constants";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { MONTHLY_PRICE, TRIAL_DAYS } = await import("../billing.server");
   const { session, admin, billing } = await authenticate.admin(request);
   const shop = await getOrCreateShop(session.shop, session.accessToken);
 

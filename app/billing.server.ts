@@ -4,14 +4,15 @@ import {
 } from "@shopify/shopify-app-remix/server";
 import prisma from "./db.server";
 import type { Shop } from "@prisma/client";
+import { MONTHLY_PRICE, TRIAL_DAYS } from "./billing.constants";
 
 export const BILLING_PLANS = {
   TRIAL: "trial",
   MONTHLY: "monthly",
 } as const;
 
-export const MONTHLY_PRICE = 9.99;
-export const TRIAL_DAYS = 7;
+// Re-export constants for backward compatibility
+export { MONTHLY_PRICE, TRIAL_DAYS };
 
 /**
  * Check if a shop is a test/development store
