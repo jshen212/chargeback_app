@@ -3,6 +3,7 @@ import { Link, Outlet, useLoaderData, useRouteError } from "@remix-run/react";
 import { boundary } from "@shopify/shopify-app-remix/server";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
 import { NavMenu } from "@shopify/app-bridge-react";
+import { Text, InlineStack } from "@shopify/polaris";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
 import { authenticate } from "../shopify.server";
@@ -28,10 +29,33 @@ export default function App() {
         <Link to="/app" rel="home">
           Home
         </Link>
-        <Link to="/app/billing">Billing</Link>
-        <Link to="/app/additional">Additional page</Link>
       </NavMenu>
       <Outlet />
+      <div style={{ marginTop: "2rem", padding: "1.5rem", textAlign: "center", borderTop: "1px solid #e1e3e5" }}>
+        <InlineStack gap="400" align="center">
+          <Text as="span" variant="bodySm" tone="subdued">
+            <Link to="/app/privacy">
+              Privacy Policy
+            </Link>
+          </Text>
+          <Text as="span" variant="bodySm" tone="subdued">
+            |
+          </Text>
+          <Text as="span" variant="bodySm" tone="subdued">
+            <Link to="/app/terms">
+              Terms of Service
+            </Link>
+          </Text>
+          <Text as="span" variant="bodySm" tone="subdued">
+            |
+          </Text>
+          <Text as="span" variant="bodySm" tone="subdued">
+            <Link url="mailto:cbhelper.team@gmail.com" external>
+              cbhelper.team@gmail.com
+            </Link>
+          </Text>
+        </InlineStack>
+      </div>
     </AppProvider>
   );
 }

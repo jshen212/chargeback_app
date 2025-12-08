@@ -16,41 +16,9 @@ import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { getDisputeById, createDisputeResponse } from "../models.server";
 import { generateDisputeResponse } from "../openai.server";
-import { isTestStore } from "../billing.server";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { billing, admin, session } = await authenticate.admin(request);
-
-  // Check if this is a test store - bypass billing for test stores
-  const testStore = await isTestStore(admin, session.shop);
-
-  if (!testStore) {
-    // Gate this route - require active billing per Shopify guidelines
-    try {
-      await (billing.require as any)({
-        plans: ["monthly"],
-        isTest: process.env.NODE_ENV !== "production",
-        onFailure: () => {
-          throw new Response(null, {
-            status: 302,
-            headers: {
-              Location: "/app/billing",
-            },
-          });
-        },
-      });
-    } catch (error) {
-      if (error instanceof Response) {
-        throw error;
-      }
-      throw new Response(null, {
-        status: 302,
-        headers: {
-          Location: "/app/billing",
-        },
-      });
-    }
-  }
+  const { session } = await authenticate.admin(request);
 
   const disputeId = params.id;
 
@@ -68,38 +36,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const { billing, admin, session } = await authenticate.admin(request);
-
-  // Check if this is a test store - bypass billing for test stores
-  const testStore = await isTestStore(admin, session.shop);
-
-  if (!testStore) {
-    // Gate this route - require active billing per Shopify guidelines
-    try {
-      await (billing.require as any)({
-        plans: ["monthly"],
-        isTest: process.env.NODE_ENV !== "production",
-        onFailure: () => {
-          throw new Response(null, {
-            status: 302,
-            headers: {
-              Location: "/app/billing",
-            },
-          });
-        },
-      });
-    } catch (error) {
-      if (error instanceof Response) {
-        throw error;
-      }
-      throw new Response(null, {
-        status: 302,
-        headers: {
-          Location: "/app/billing",
-        },
-      });
-    }
-  }
+  const { session } = await authenticate.admin(request);
 
   const disputeId = params.id;
 

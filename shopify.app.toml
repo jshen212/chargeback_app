@@ -29,3 +29,9 @@ scopes = "read_shopify_payments_disputes"
 
 [auth]
 redirect_urls = [ "https://chargeback-app-rho.vercel.app/api/auth" ]
+
+# Privacy Policy and Terms of Service
+# These URLs should also be configured in your Shopify Partner Dashboard
+# Privacy Policy: https://chargeback-app-rho.vercel.app/privacy
+# Terms of Service: https://chargeback-app-rho.vercel.app/terms
+# Contact Email: cbhelper.team@gmail.com
