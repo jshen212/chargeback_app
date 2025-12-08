@@ -11,9 +11,9 @@ import db from "../db.server";
  * Reference: https://shopify.dev/docs/apps/build/compliance/privacy-law-compliance
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
+  // Verify HMAC signature - authenticate.webhook() throws if invalid
+  // We need to catch this and return 401 as required by Shopify
   try {
-    // authenticate.webhook() verifies HMAC signature automatically
-    // Returns 401 if HMAC is invalid
     const { topic, shop, payload } = await authenticate.webhook(request);
 
     console.log(`Received ${topic} webhook for ${shop}`);
@@ -208,14 +208,28 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return new Response(null, { status: 200 });
   } catch (error) {
     // authenticate.webhook() throws if HMAC is invalid
-    // Return 401 as required by Shopify
-    if (error instanceof Error && (error.message.includes("HMAC") || error.message.includes("Unauthorized"))) {
-      console.error("Invalid HMAC signature");
+    // Check if it's an HTTP response (which authenticate.webhook might throw)
+    if (error instanceof Response) {
+      // If it's already a 401 response, return it
+      if (error.status === 401) {
+        return error;
+      }
+    }
+    
+    // Check for HMAC/authentication errors
+    if (
+      error instanceof Error &&
+      (error.message.includes("HMAC") ||
+        error.message.includes("Unauthorized") ||
+        error.message.includes("authentication") ||
+        error.message.includes("signature"))
+    ) {
+      console.error("Invalid HMAC signature or authentication error");
       return new Response("Unauthorized", { status: 401 });
     }
 
     // Log other errors but still return 200 to acknowledge receipt
-    // (Shopify requires 200 series status codes)
+    // (Shopify requires 200 series status codes for compliance webhooks)
     console.error("Error processing compliance webhook:", error);
     return new Response(null, { status: 200 });
   }
