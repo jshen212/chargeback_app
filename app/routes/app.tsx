@@ -6,11 +6,15 @@ import { NavMenu } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
 import { authenticate } from "../shopify.server";
+import { getOrCreateShop } from "../models.server";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
+
+  // Ensure shop exists in shops table (creates if doesn't exist, updates if it does)
+  await getOrCreateShop(session.shop, session.accessToken);
 
   return { apiKey: process.env.SHOPIFY_API_KEY || "" };
 };

@@ -33,3 +33,41 @@ model Session {
 
   @@map("session")
 }
+
+model Shop {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  shopDomain String  @unique @map("shop_domain")
+  accessToken String? @map("access_token")
+  active    Boolean  @default(true)
+  plan      String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  disputes Dispute[]
+
+  @@map("shops")
+}
+
+model Dispute {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  shopId             String   @map("shop_id") @db.Uuid
+  shopifyDisputeId    String   @map("shopify_dispute_id")
+  orderId             String?  @map("order_id")
+  orderName           String?  @map("order_name")
+  customerEmail       String?  @map("customer_email")
+  status              String?
+  reason              String?
+  chargebackReason    String?  @map("chargeback_reason")
+  amount              Decimal? @db.Decimal
+  currency            String?
+  evidenceDueBy       DateTime? @map("evidence_due_by") @db.Timestamptz(6)
+  evidenceSubmitted   Boolean? @default(false) @map("evidence_submitted")
+  rawPayload          Json     @map("raw_payload") @db.JsonB
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, shopifyDisputeId], map: "disputes_shop_dispute_unique")
+  @@map("disputes")
+}
