@@ -8,12 +8,18 @@ import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prism
 import prisma from "./db.server";
 import { getBillingConfig } from "./billing.server";
 
+// Ensure appUrl is set correctly - use Vercel URL if on Vercel and SHOPIFY_APP_URL is not set
+const appUrl = process.env.SHOPIFY_APP_URL || 
+  (process.env.VERCEL 
+    ? `https://${process.env.VERCEL_URL || "chargeback-app-rho.vercel.app"}` 
+    : "");
+
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
   apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
   apiVersion: ApiVersion.January25,
   scopes: process.env.SCOPES?.split(","),
-  appUrl: process.env.SHOPIFY_APP_URL || "",
+  appUrl: appUrl,
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
