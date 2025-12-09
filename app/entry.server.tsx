@@ -1,3 +1,23 @@
+// Load environment variables from .env file if it exists
+// This ensures env vars work in production when not using shopify app dev
+import { config } from "dotenv";
+import { resolve } from "path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load .env file if it exists
+// In Vercel/production, environment variables should be set in the platform
+// But we still load .env for local development and production testing
+// dotenv won't override existing environment variables, so platform vars take precedence
+if (!process.env.VERCEL) {
+  // Always try to load .env file when not on Vercel
+  // This works for both development and local production testing
+  config({ path: resolve(__dirname, "../.env") });
+}
+
 import { PassThrough } from "stream";
 import { renderToPipeableStream } from "react-dom/server";
 import { RemixServer } from "@remix-run/react";

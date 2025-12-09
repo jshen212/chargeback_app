@@ -9,10 +9,12 @@ export async function generateDisputeResponse(disputeDetails: {
   currency?: string | null;
   rawPayload: unknown;
 }): Promise<string> {
+  // Ensure we have the API key - check both process.env and ensure it's loaded
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
-    throw new Error("OPENAI_API_KEY environment variable is not set");
+    console.error("OPENAI_API_KEY is not set. Available env vars:", Object.keys(process.env).filter(k => k.includes("OPENAI") || k.includes("API")));
+    throw new Error("OPENAI_API_KEY environment variable is not set. Please ensure it's configured in your environment variables or .env file.");
   }
 
   const prompt = `You are a chargeback dispute response expert. Generate a professional, persuasive dispute response based on the following information:
