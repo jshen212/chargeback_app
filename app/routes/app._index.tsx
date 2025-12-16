@@ -13,10 +13,20 @@ import {
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { getDisputes } from "../models.server";
+import { syncDisputes } from "../disputes.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
 
+  // Sync disputes from Shopify to ensure we have the latest data
+  try {
+    await syncDisputes(admin, session.shop);
+  } catch (error) {
+    console.error("Error syncing disputes:", error);
+    // Continue to show existing disputes even if sync fails
+  }
+
+  // Get disputes from database
   const disputes = await getDisputes(session.shop);
 
   return { disputes };
